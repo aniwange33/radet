@@ -94,6 +94,9 @@ public class RadetConverterService {
         cell.setCellValue("Sex");
         cell.setCellStyle(style);
         cell = row.createCell(cellNum++);
+        cell.setCellValue("Target Group");
+        cell.setCellStyle(style);
+        cell = row.createCell(cellNum++);
         cell.setCellValue("Current Weight (Kg)");
         cell.setCellStyle(style);
         cell = row.createCell(cellNum++);
@@ -254,7 +257,9 @@ public class RadetConverterService {
         AtomicInteger sn = new AtomicInteger();
         List<RadetEntry> radetEntries = new ArrayList<>();
         List<RadetEntry> finalEntries = new ArrayList<>();
-        String query = "SELECT DISTINCT id, hospital_num, unique_id, enrollment_setting, gender, date_birth, extra->'ovc'->>'householdUniqueNo' household_unique_no," +
+        String query = "SELECT DISTINCT id, hospital_num, unique_id, enrollment_setting, gender, date_birth," +
+                " extra->'ovc'->>'householdUniqueNo' household_unique_no," +
+                " extra->>'targetGroup' target_group," +
                 "   jsonb_array_length(extra->'ovc'->'servicesProvided') > 0 services_provided, " +
                 "   date_started, DATEDIFF('YEAR', date_birth, CURRENT_DATE) age, status_at_registration FROM patient pl WHERE " +
                 "   facility_id = ? AND date_started BETWEEN ? AND ? and archived = false and " +
@@ -269,6 +274,7 @@ public class RadetConverterService {
                 String enrollmentSetting = StringUtils.trimToEmpty(resultSet.getString("enrollment_setting"));
                 LocalDate dateBirth = resultSet.getObject("date_birth", LocalDate.class);
                 LocalDate dateStarted = resultSet.getObject("date_started", LocalDate.class);
+                String targetGroup = StringUtils.trimToEmpty(resultSet.getString("target_group"));
                 int age = resultSet.getInt("age");
 
                 boolean servicesProvided = resultSet.getBoolean("services_provided");
@@ -288,6 +294,7 @@ public class RadetConverterService {
                 patientEntry.setDob(dateBirth);
                 patientEntry.setDateStarted(dateStarted);
                 patientEntry.setAge(age);
+                patientEntry.setTargetGroup(targetGroup);
                 patientEntry.setStatusAtRegistration(resultSet.getString("status_at_registration"));
                 entries.add(patientEntry);
 
@@ -317,6 +324,7 @@ public class RadetConverterService {
 
         }
         messagingTemplate.convertAndSend("/topic/radet/status", "Building sheet...");
+        LOG.info("record size: {}", finalEntries.size());
         buildSheet(sheet, dateStyle, finalEntries);
         messagingTemplate.convertAndSend("/topic/radet/status", "Writing out file...");
         try {
@@ -338,6 +346,7 @@ public class RadetConverterService {
         try {
             entry.setHouseholdUniqueNo(patientEntry.getHouseholdUniqueNo());
             entry.setReceivedOvcService(patientEntry.getServicesProvided());
+            entry.setTargetGroup(patientEntry.getTargetGroup());
             jdbcTemplate.query("SELECT body_weight FROM clinic WHERE patient_id = ? AND " +
                     "date_visit <= ? AND body_weight > 0 and archived = false ORDER BY date_visit DESC LIMIT 1", rs -> {
                 entry.setWeight(rs.getDouble("body_weight"));
@@ -839,7 +848,9 @@ public class RadetConverterService {
                 cell.setCellValue(entry.getUniqueId());
             }
             cell = row.createCell(cellNum++);
-            cell.setCellValue(entry.getHospitalNum());
+            if (entry.getHospitalNum() != null) {
+                cell.setCellValue(entry.getHospitalNum());
+            }
             cell = row.createCell(cellNum++);
             if (entry.getHouseholdUniqueNo() != null) {
                 cell.setCellValue(entry.getHouseholdUniqueNo());
@@ -850,6 +861,8 @@ public class RadetConverterService {
             }
             cell = row.createCell(cellNum++);
             cell.setCellValue(entry.getSex());
+            cell = row.createCell(cellNum++);
+            cell.setCellValue(entry.getTargetGroup());
             cell = row.createCell(cellNum++);
             if (entry.getWeight() != null) {
                 cell.setCellValue(entry.getWeight());

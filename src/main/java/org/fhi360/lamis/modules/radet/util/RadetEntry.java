@@ -65,4 +65,6 @@ public class RadetEntry {
     String cervicalCancerScreeningType;
     String resultOfCervicalCancerScreening;
     String precancerousScreeningMethods;
+    String targetGroup;
+
 }

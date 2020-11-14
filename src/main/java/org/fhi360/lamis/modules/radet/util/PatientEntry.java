@@ -18,4 +18,5 @@ public class PatientEntry {
     String artEnrollmentSetting;
     String householdUniqueNo;
     String servicesProvided;
+    String targetGroup;
 }
